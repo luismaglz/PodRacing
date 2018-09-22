@@ -63,7 +63,7 @@ while (true) {
     var myPod = new Pod(inputs[0], inputs[1]);
     var nextCheckPoint = new CheckPoint(inputs[2], inputs[3], inputs[4], inputs[5]);
     printDebug(nextCheckPoint);
-    // printDebug(tracking);
+    printDebug(tracking);
 
     var checkPointIndex = tracking.track.findIndex(checkpoint => checkpoint.id === nextCheckPoint.id);
 
@@ -71,7 +71,12 @@ while (true) {
         tracking.track.push(nextCheckPoint);
     }
 
-    tracking.trackMapped = tracking.track.length > 1 && checkPointIndex === 0;
+    printDebug(checkPointIndex);
+
+
+    if (tracking.track.length > 1 && checkPointIndex === 0 && tracking.trackMapped == false) {
+        tracking.trackMapped = true;
+    }
 
     var inputs = readline().split(' ');
     var enemyPod = new Pod(inputs[0], inputs[1]);
@@ -81,26 +86,31 @@ while (true) {
 
     if (nextCheckPoint.angle > 90 || nextCheckPoint.angle < -90) {
         var angle = Math.abs(nextCheckPoint.angle);
+        thrust = 10;
+    } else if (nextCheckPoint.angle > 70 || nextCheckPoint.angle < -70) {
+        var angle = Math.abs(nextCheckPoint.angle);
         thrust = 30;
+    } else if (nextCheckPoint.angle > 50 || nextCheckPoint.angle < -50) {
+        var angle = Math.abs(nextCheckPoint.angle);
+        thrust = 50;
     } else if (nextCheckPoint.angle > 45 || nextCheckPoint.angle < -45) {
         var angle = Math.abs(nextCheckPoint.angle);
         thrust = 80;
     }
-    else {
 
-        if (nextCheckPoint.distance < 1500 && nextCheckPoint.angle === 0) {
-            thrust = 20;
-        } else if (nextCheckPoint.distance < 600) {
-            thrust = 20;
+    if (nextCheckPoint.distance < 2000) {
+        var deaccelerateFactor = Math.floor(nextCheckPoint.distance / 40);
+        if (deaccelerateFactor > thrust) {
+            deaccelerateFactor = thrust;
         }
-
-        if (tracking.boostAvailable && Math.abs(nextCheckPoint.angle) < 3 && nextCheckPoint.distance < 4000) {
-            thrust = 'BOOST';
-            tracking.boostAvailable = false;
-        }
-
+        thrust -= deaccelerateFactor;
     }
-    printDebug({areWeInLine:areWeInLine(myPod, enemyPod, nextCheckPoint)});
+
+    if (tracking.boostAvailable &&  nextCheckPoint.distance > 3000 && Math.abs(nextCheckPoint.angle) < 6 && tracking.trackMapped && tracking.track[tracking.track.length - 1].id === nextCheckPoint.id) {
+        thrust = 'BOOST';
+        tracking.boostAvailable = false;
+    }
+
     moveToCheckPoint(nextCheckPoint.positionX, nextCheckPoint.positionY, thrust);
 }
 
