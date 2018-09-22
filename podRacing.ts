@@ -132,7 +132,7 @@ while (true) {
 
     if (nextCheckPoint.distance < 2000 && getDistanceBetweenPods(myPod, enemyPod) < 1000) {
         if (getDistanceBetweenPods(myPod, nextCheckPoint) > getDistanceBetweenPods(enemyPod, nextCheckPoint)) {
-            thrust = 0;
+            thrust = "SHIELD";
         }
     } 
 
