@@ -18,20 +18,15 @@ class CheckPoint extends Point {
     }
 }
 ;
-function moveToCheckPoint(x, y, thrust) {
-    return print(`${x} ${y} ${thrust} ${thrust}`);
-}
 function printDebug(value) {
     printErr(JSON.stringify(value));
 }
+function moveToCheckPoint(x, y, thrust) {
+    printDebug({ moveTo: `${x} ${y} ${thrust} ${thrust}` });
+    return print(`${x} ${y} ${thrust} ${thrust}`);
+}
 function isInAngleThreshold(angle, threshold) {
     return (angle > threshold || angle < threshold);
-}
-function areWeInLine(me, enemy, checkpoint) {
-    var slope1 = (enemy.positionY - enemy.positionX) / (me.positionY - me.positionX);
-    var slope2 = (checkpoint.positionY - checkpoint.positionX) / (enemy.positionY - enemy.positionX);
-    var slope3 = (checkpoint.positionY - checkpoint.positionX) / (me.positionY - me.positionX);
-    return slope1 == slope2 && slope1 == slope3;
 }
 function isLastCheckPoint(checkPoint) {
     return checkPoint.id === tracking.track[tracking.track.length - 1].id;
@@ -48,17 +43,24 @@ function isEnemyUsingBoostAtStart() {
 }
 function getAllowedAngleForPredicting(checkPoint) {
     var distanceToCheckpoint = checkPoint.distance;
-    var checkPointRadius = 450;
+    var checkPointRadius = 300;
     var angleOfAttack = Math.atan(checkPointRadius / distanceToCheckpoint) * (180 / Math.PI);
     return angleOfAttack;
+}
+function getRelativePositionFromCheckPoint(myPod, checkPoint) {
+    var point = new Point(checkPoint.positionX.toString(), checkPoint.positionY.toString());
+    point.positionX = checkPoint.positionX - myPod.positionX;
+    ;
+    point.positionY = checkPoint.positionY - myPod.positionY;
+    return point;
 }
 var tracking = {
     frames: 0,
     boostAvailable: true,
     trackMapped: false,
-    enemyPodLastPosition: new Pod('0', '0'),
+    previousPosition: new Pod('0', '0'),
     track: new Array(),
-    trackLength: 0
+    trackLength: 0,
 };
 while (true) {
     tracking.frames++;
@@ -71,6 +73,9 @@ while (true) {
     var useBoost = false;
     if (checkPointPredicted && (checkPointPredicted.id == nextCheckPoint.id)) {
         checkPointPredicted = new CheckPoint('', '', '', '');
+    }
+    if (tracking.frames == 1) {
+        tracking.previousPosition = myPod;
     }
     if (checkPointIndex === -1) {
         tracking.track.push(nextCheckPoint);
@@ -90,31 +95,18 @@ while (true) {
         angleOffSet = Math.abs(nextCheckPoint.angle);
     }
     if (angleOffSet > 90) {
-        if (getDistanceBetweenPods(myPod, enemyPod) < 900) {
-            thrust = 100;
-        }
-        else {
+        thrust = 0;
+    }
+    else {
+        thrust = 100 - Math.floor(angleOffSet / 2);
+    }
+    if (nextCheckPoint.distance < 2000 && getDistanceBetweenPods(myPod, enemyPod) < 1000) {
+        if (getDistanceBetweenPods(myPod, nextCheckPoint) > getDistanceBetweenPods(enemyPod, nextCheckPoint)) {
             thrust = 0;
         }
     }
-    else {
-        thrust = 100 - angleOffSet;
-    }
-    if (nextCheckPoint.distance < 2000 && getDistanceBetweenPods(myPod, enemyPod) < 1500) {
-        thrust = 70;
-        printDebug('BOOSTING');
-    }
-    else if (nextCheckPoint.distance < 2000 && getDistanceBetweenPods(myPod, enemyPod) > 1000) {
-        var rate = Math.floor(100 - (nextCheckPoint.distance / 20));
-        thrust = thrust - rate;
-        if (thrust < 1) {
-            thrust = 10;
-        }
-        printDebug('BREAKING');
-    }
-    if (tracking.trackMapped && angleOffSet < 90 && nextCheckPoint.distance < 1500 && angleOffSet < getAllowedAngleForPredicting(nextCheckPoint)) {
+    if (tracking.trackMapped && angleOffSet < 90 && nextCheckPoint.distance < 2000 && angleOffSet < getAllowedAngleForPredicting(nextCheckPoint)) {
         var checkPointIndex = tracking.track.findIndex(cp => cp.id === nextCheckPoint.id);
-        printDebug('PREDICTING');
         if (checkPointIndex > tracking.track.length - 1) {
             checkPointIndex = 0;
         }
@@ -123,20 +115,19 @@ while (true) {
     if (isEnemyUsingBoostAtStart()) {
         useBoost = true;
     }
-    else if (tracking.trackMapped && isLastCheckPoint && nextCheckPoint.distance > 3000 && angleOffSet < getAllowedAngleForPredicting(nextCheckPoint)) {
+    else if (tracking.trackMapped && isLastCheckPoint(nextCheckPoint) && nextCheckPoint.distance > 3000 && angleOffSet === 0) {
         useBoost = true;
     }
-    if (checkPointPredicted) {
-        printDebug({ predicted: checkPointPredicted });
-        printDebug({ predictedAvailable: checkPointPredicted.id != '' });
-    }
-    printDebug({ angleOfAttack: getAllowedAngleForPredicting(nextCheckPoint) });
     printDebug({ nextCheck: nextCheckPoint });
+    printDebug({ pred: checkPointPredicted });
+    printDebug({ velocity: getDistanceBetweenPods(tracking.previousPosition, myPod) });
+    var relativePosition = getRelativePositionFromCheckPoint(myPod, nextCheckPoint);
+    printDebug({ relative: relativePosition });
     if (useBoost && tracking.boostAvailable) {
         moveToCheckPoint(nextCheckPoint.positionX, nextCheckPoint.positionY, 'BOOST');
         tracking.boostAvailable = false;
     }
-    else if (checkPointPredicted && checkPointPredicted.id != '' && angleOffSet < 45) {
+    else if (checkPointPredicted && checkPointPredicted.id != '' && angleOffSet < 45 && thrust > 50) {
         printDebug('STEERING TO PREDICTED');
         moveToCheckPoint(checkPointPredicted.positionX, checkPointPredicted.positionY, thrust);
     }
